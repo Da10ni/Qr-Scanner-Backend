@@ -9,8 +9,37 @@ import authRouter from './routes/auth.js';
 
 const app = express();
 
-app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || '*' }));
+const allowedOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.length === 0) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    if (/^https:\/\/qr-scanner-frontend.*\.vercel\.app$/.test(origin)) return cb(null, true);
+    return cb(new Error(`CORS blocked: ${origin}`));
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: '64kb' }));
+
+app.get('/', (_req, res) => {
+  res.json({
+    name: 'QR Feedback API',
+    status: 'ok',
+    endpoints: {
+      'GET  /api/health': 'health check',
+      'POST /api/feedback': 'submit feedback (public)',
+      'POST /api/auth/login': 'admin login → { token }',
+      'GET  /api/feedback': 'list all (Bearer token)',
+      'DELETE /api/feedback/:id': 'delete one (Bearer token)'
+    },
+    frontend: 'http://localhost:5173'
+  });
+});
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRouter);
